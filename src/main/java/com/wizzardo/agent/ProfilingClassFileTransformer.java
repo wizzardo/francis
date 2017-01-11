@@ -23,7 +23,7 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
         byte[] byteCode = classfileBuffer;
 
         if (classBeingRedefined != null) {
-            List<Francis.TransformationDefinition> list = Francis.instrumentations.get(classBeingRedefined);
+            List<TransformationDefinition> list = Francis.instrumentations.get(classBeingRedefined);
             if (list != null && !list.isEmpty()) {
                 long time = System.nanoTime();
                 try {
@@ -33,10 +33,10 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
                     new File("/tmp/classes").mkdirs();
                     Files.write(new File("/tmp/classes/" + classBeingRedefined.getCanonicalName() + ".before.class").toPath(), byteCode);
 
-                    Iterator<Francis.TransformationDefinition> iterator = list.iterator();
+                    Iterator<TransformationDefinition> iterator = list.iterator();
                     try {
                         while (iterator.hasNext()) {
-                            Francis.TransformationDefinition definition = iterator.next();
+                            TransformationDefinition definition = iterator.next();
                             CtMethod m = cc.getMethod(definition.method, definition.methodDescriptor);
                             //$args[0] - method arguments
                             System.out.println("transforming " + m.getLongName());

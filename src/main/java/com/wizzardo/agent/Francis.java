@@ -1,12 +1,16 @@
 package com.wizzardo.agent;
 
+import com.wizzardo.http.websocket.Message;
+import com.wizzardo.http.websocket.SimpleWebSocketClient;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.NotFoundException;
 
+import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,19 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Created by wizzardo on 13/01/17.
  */
 public class Francis {
-
-    public static class TransformationDefinition {
-        public Class clazz;
-        public String method;
-        public String methodDescriptor;
-        public String before;
-        public String after;
+    static {
+        System.out.println("loaded by " + Francis.class.getClassLoader());
     }
-
-    public interface ExceptionHandler {
-        void handle(Exception e);
-    }
-
 
     static Instrumentation instrumentation;
     static Map<Class, List<TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
@@ -37,6 +31,21 @@ public class Francis {
     public static void premain(String args, Instrumentation instrumentation) {
         instrumentation.addTransformer(new ProfilingClassFileTransformer(), true);
         Francis.instrumentation = instrumentation;
+
+        try {
+            String francisWsUrl = System.getenv("FRANCIS_WS_URL");
+            if (francisWsUrl == null || francisWsUrl.isEmpty())
+                francisWsUrl = "ws://localhost:8082/ws/client";
+
+            SimpleWebSocketClient client = new WebSocketClient(francisWsUrl);
+            client.start();
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
     public static void handleException(Exception e) {
