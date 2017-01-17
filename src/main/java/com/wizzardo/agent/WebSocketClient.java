@@ -23,10 +23,27 @@ public class WebSocketClient extends SimpleWebSocketClient {
     }
 
     public WebSocketClient(String url) throws URISyntaxException, IOException {
-        super(url);
+        super(new Request(url));
         setDaemon(true);
 
         handlers.put("hello", json -> System.out.println(json));
+    }
+
+    @Override
+    protected synchronized void handShake(Request request) throws IOException {
+        boolean failing = true;
+        while (failing)
+            try {
+                super.handShake(request);
+                failing = false;
+            } catch (IOException e) {
+                System.out.println("Connection failed: " + e.getMessage());
+                System.out.println("will retry in 1 second");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
+            }
     }
 
     @Override
