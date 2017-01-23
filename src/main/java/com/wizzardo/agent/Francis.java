@@ -1,7 +1,5 @@
 package com.wizzardo.agent;
 
-import com.wizzardo.http.websocket.Message;
-import com.wizzardo.http.websocket.SimpleWebSocketClient;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -37,7 +35,8 @@ public class Francis {
             if (francisWsUrl == null || francisWsUrl.isEmpty())
                 francisWsUrl = "ws://localhost:8082/ws/client";
 
-            SimpleWebSocketClient client = new WebSocketClient(francisWsUrl);
+            WebSocketClient client = new WebSocketClient(francisWsUrl);
+            WebSocketHandlers.register(client);
             client.start();
         } catch (URISyntaxException e) {
             e.printStackTrace();

@@ -27,32 +27,12 @@ public class WebSocketClient extends SimpleWebSocketClient {
         super(new Request(url));
         setDaemon(true);
         setDefaultUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+    }
 
-        handlers.put("hello", json -> {
-            System.out.println(json);
-
-            JsonObject jsonManifest;
-            JsonObject response = new JsonObject()
-                    .append("command", "setParameters")
-                    .append("params", jsonManifest = new JsonObject());
-            try {
-                String appName = System.getenv("APP_NAME");
-                if (appName != null)
-                    jsonManifest.append("appName", appName);
-
-                Manifest manifest = new Manifest(String.class.getResourceAsStream("/META-INF/MANIFEST.MF"));
-                manifest.getMainAttributes().forEach((k, v) ->
-                        jsonManifest.append(String.valueOf(k), String.valueOf(v))
-                );
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            try {
-                send(response);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+    public void registerHandler(String command, CommandHandler handler) {
+        CommandHandler old = handlers.putIfAbsent(command, handler);
+        if (old != null)
+            throw new IllegalArgumentException("Handler for command '" + command + "' is already registered");
     }
 
     @Override
@@ -86,8 +66,12 @@ public class WebSocketClient extends SimpleWebSocketClient {
 
     }
 
-    public void send(JsonObject json) throws IOException {
-        super.send(json.toString());
+    public void send(JsonObject json) {
+        try {
+            super.send(json.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
