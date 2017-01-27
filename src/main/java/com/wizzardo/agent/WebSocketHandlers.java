@@ -2,7 +2,10 @@ package com.wizzardo.agent;
 
 import com.wizzardo.tools.json.JsonArray;
 import com.wizzardo.tools.json.JsonObject;
-
+import com.wizzardo.tools.misc.Unchecked;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
 import java.util.Arrays;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -47,6 +50,42 @@ public class WebSocketHandlers {
                             Arrays.stream(classes).map(Class::getCanonicalName).collect(Collectors.toList())
                     ))
             );
+        });
+
+        client.registerHandler("listMethods", json -> {
+            String classname = json.getAsString("class");
+            try {
+                ClassPool cp = ClassPool.getDefault();
+                CtClass cc = cp.get(classname);
+                CtMethod[] declaredMethods = cc.getDeclaredMethods();
+                client.send(new JsonObject()
+                        .append("command", "listMethods")
+                        .append("callbackId", json.getAsInteger("callbackId"))
+                        .append("list", new JsonArray().appendAll(
+                                Arrays.stream(declaredMethods).map(it ->
+                                        Unchecked.call(() -> new JsonObject()
+                                                .append("name", it.getName())
+                                                .append("descriptor", it.getSignature())
+                                                .append("returnType", it.getReturnType().getName()))
+                                                .append("args", new JsonArray().appendAll(Unchecked.call(() ->
+                                                        Arrays.stream(it.getParameterTypes()).map(CtClass::getName).collect(Collectors.toList()))))
+                                ).collect(Collectors.toList())
+                        ))
+                );
+            } catch (Exception e) {
+                client.send(new JsonObject()
+                        .append("command", "listMethods")
+                        .append("callbackId", json.getAsInteger("callbackId"))
+                        .append("error", "Cannot get methods from '" + classname + "'")
+                        .append("message", e.getMessage())
+                        .append("exceptionClass", e.getClass().getCanonicalName())
+                        .append("stacktrace", new JsonArray()
+                                .appendAll(Arrays.stream(e.getStackTrace())
+                                        .map(it -> it.getClassName() + "." + it.getMethodName() + ":" + it.getLineNumber())
+                                        .collect(Collectors.toList()))
+                        )
+                );
+            }
         });
     }
 }
