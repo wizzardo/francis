@@ -1,12 +1,16 @@
 package com.wizzardo.agent;
 
 import com.wizzardo.tools.json.JsonArray;
+import com.wizzardo.tools.json.JsonItem;
 import com.wizzardo.tools.json.JsonObject;
 import com.wizzardo.tools.misc.Unchecked;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
+
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
@@ -76,16 +80,64 @@ public class WebSocketHandlers {
                 client.send(new JsonObject()
                         .append("command", "listMethods")
                         .append("callbackId", json.getAsInteger("callbackId"))
-                        .append("error", "Cannot get methods from '" + classname + "'")
-                        .append("message", e.getMessage())
-                        .append("exceptionClass", e.getClass().getCanonicalName())
-                        .append("stacktrace", new JsonArray()
-                                .appendAll(Arrays.stream(e.getStackTrace())
-                                        .map(it -> it.getClassName() + "." + it.getMethodName() + ":" + it.getLineNumber())
-                                        .collect(Collectors.toList()))
-                        )
+                        .append("error", exceptionToJson(e))
                 );
             }
         });
+
+        client.registerHandler("addTransformation", json -> {
+            TransformationDefinition definition = new TransformationDefinition();
+            definition.id = json.getAsLong("id");
+            definition.clazz = json.getAsString("class");
+            definition.method = json.getAsString("method");
+            definition.methodDescriptor = json.getAsString("methodDescriptor");
+            definition.before = json.getAsString("before");
+            definition.after = json.getAsString("after");
+            JsonArray localVariables = json.getAsJsonArray("localVariables");
+            if (localVariables == null) {
+                definition.localVariables = Collections.emptyList();
+            } else {
+                definition.localVariables = new ArrayList<>(localVariables.size());
+                for (JsonItem item : localVariables) {
+                    TransformationDefinition.Variable variable = new TransformationDefinition.Variable();
+                    variable.name = item.asJsonObject().getAsString("name");
+                    variable.type = item.asJsonObject().getAsString("type");
+                    definition.localVariables.add(variable);
+                }
+            }
+            try {
+                Francis.instrument(definition);
+            } catch (Throwable t) {
+                client.send(new JsonObject()
+                        .append("command", "transformationError")
+                        .append("error", WebSocketHandlers.exceptionToJson(t))
+                        .append("transformationId", definition.id)
+                        .append("before", definition.before)
+                        .append("after", definition.after)
+                        .append("class", definition.clazz)
+                        .append("method", definition.method)
+                        .append("methodDescriptor", definition.methodDescriptor)
+                        .append("localVariables", new JsonArray().appendAll(definition.localVariables.stream()
+                                .map(it -> new JsonObject().append("name", it.name).append("type", it.type)).collect(Collectors.toList())
+                        ))
+                );
+            }
+        });
+    }
+
+    public static JsonObject exceptionToJson(Throwable t) {
+        JsonObject json = new JsonObject()
+                .append("message", t.getMessage())
+                .append("class", t.getClass().getCanonicalName())
+                .append("stacktrace", new JsonArray()
+                        .appendAll(Arrays.stream(t.getStackTrace())
+                                .map(it -> it.getClassName() + "." + it.getMethodName() + ":" + it.getLineNumber())
+                                .collect(Collectors.toList()))
+                );
+
+        if (t.getCause() != null)
+            json.append("cause", exceptionToJson(t.getCause()));
+
+        return json;
     }
 }
