@@ -22,6 +22,7 @@ public class Runner {
         };
         Thread.currentThread().setContextClassLoader(classloader);
         Class<?> aClass = classloader.loadClass("com.wizzardo.agent.Francis");
+        aClass.getMethod("setMainClassLoader", ClassLoader.class).invoke(null, contextClassLoader);
         aClass.getMethod("premain", String.class, Instrumentation.class).invoke(null, args, instrumentation);
 
         Thread.currentThread().setContextClassLoader(contextClassLoader);

@@ -20,22 +20,23 @@ public class Francis {
         System.out.println("loaded by " + Francis.class.getClassLoader());
     }
 
+    static ClassLoader mainClassLoader;
     static Instrumentation instrumentation;
-    static Map<Class, List<TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
+    static Map<String, List<TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
     static ExceptionHandler exceptionHandler = e -> {
         e.printStackTrace();
     };
 
     public static void premain(String args, Instrumentation instrumentation) {
-        instrumentation.addTransformer(new ProfilingClassFileTransformer(), true);
         Francis.instrumentation = instrumentation;
+        WebSocketClient client = null;
 
         try {
             String francisWsUrl = System.getenv("FRANCIS_WS_URL");
             if (francisWsUrl == null || francisWsUrl.isEmpty())
                 francisWsUrl = "ws://localhost:8082/ws/client";
 
-            WebSocketClient client = new WebSocketClient(francisWsUrl);
+            client = new WebSocketClient(francisWsUrl);
             WebSocketHandlers.register(client);
             client.start();
         } catch (URISyntaxException e) {
@@ -44,7 +45,7 @@ public class Francis {
             e.printStackTrace();
         }
 
-
+        instrumentation.addTransformer(new ProfilingClassFileTransformer(client), true);
     }
 
     public static void handleException(Exception e) {
@@ -68,8 +69,12 @@ public class Francis {
         list.add(definition);
 
         try {
-            instrumentation.retransformClasses(definition.clazz);
+            Class<?> aClass = Class.forName(definition.clazz, true, mainClassLoader);
+            System.out.println("trigger retransform for " + aClass.getCanonicalName());
+            instrumentation.retransformClasses(aClass);
         } catch (UnmodifiableClassException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
@@ -82,7 +87,7 @@ public class Francis {
             List<TransformationDefinition> list = new ArrayList<>(declaredMethods.length);
             for (CtMethod method : declaredMethods) {
                 TransformationDefinition definition = new TransformationDefinition();
-                definition.clazz = cl;
+                definition.clazz = cl.getCanonicalName();
                 definition.method = method.getName();
                 definition.methodDescriptor = method.getSignature();
 
@@ -93,5 +98,9 @@ public class Francis {
             e.printStackTrace();
             return Collections.emptyList();
         }
+    }
+
+    public static void setMainClassLoader(ClassLoader classLoader) {
+        mainClassLoader = classLoader;
     }
 }
