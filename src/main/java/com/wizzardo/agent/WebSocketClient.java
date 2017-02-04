@@ -6,10 +6,8 @@ import com.wizzardo.tools.json.JsonObject;
 import com.wizzardo.tools.json.JsonTools;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.jar.Manifest;
+import java.net.*;
+import java.util.*;
 
 /**
  * Created by wizzardo on 25/01/17.
@@ -19,7 +17,10 @@ public class WebSocketClient extends SimpleWebSocketClient {
     Map<String, CommandHandler> handlers = new HashMap<>();
 
     public static void main(String[] args) throws IOException, URISyntaxException, InterruptedException {
-        new WebSocketClient("ws://localhost:8082/ws/client").start();
+//        new WebSocketClient("ws://localhost:8082/ws/client").start();
+        WebSocketClient client = new WebSocketClient("ws://localhost:8082/ws/client");
+
+
         Thread.sleep(60 * 60 * 1000);
     }
 
@@ -36,11 +37,11 @@ public class WebSocketClient extends SimpleWebSocketClient {
     }
 
     @Override
-    protected synchronized void handShake(Request request) throws IOException {
+    protected synchronized void handshake(Request request) throws IOException {
         boolean failing = true;
-        while (failing)
+        while (failing) {
             try {
-                super.handShake(request);
+                super.handshake(request);
                 failing = false;
             } catch (IOException e) {
                 System.out.println("Connection failed: " + e.getMessage());
@@ -50,6 +51,7 @@ public class WebSocketClient extends SimpleWebSocketClient {
                 } catch (InterruptedException ignored) {
                 }
             }
+        }
     }
 
     @Override
