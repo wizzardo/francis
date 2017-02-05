@@ -78,4 +78,15 @@ public class NetworkTools {
         }
         return null;
     }
+
+    public static String getHostname() {
+        try {
+            Runtime runtime = Runtime.getRuntime();
+            Process process = runtime.exec("hostname");
+            return new String(IOTools.bytes(process.getInputStream())).trim();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

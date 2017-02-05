@@ -41,6 +41,7 @@ public class WebSocketHandlers {
                 if (networkInterface != null) {
                     params.append("mac", NetworkTools.formatMacAddress(networkInterface.getHardwareAddress()));
                     params.append("ip", NetworkTools.getIPv4Address(networkInterface));
+                    params.append("hostname", NetworkTools.getHostname());
                 }
             } catch (Exception e) {
                 e.printStackTrace();
