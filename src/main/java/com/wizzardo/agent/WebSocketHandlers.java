@@ -8,6 +8,7 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
 
+import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,19 +23,25 @@ public class WebSocketHandlers {
         client.registerHandler("hello", json -> {
             System.out.println(json);
 
-            JsonObject jsonManifest;
+            JsonObject params;
             JsonObject response = new JsonObject()
                     .append("command", "setParameters")
-                    .append("params", jsonManifest = new JsonObject());
+                    .append("params", params = new JsonObject());
             try {
                 String appName = System.getenv("APP_NAME");
                 if (appName != null)
-                    jsonManifest.append("appName", appName);
+                    params.append("appName", appName);
 
                 Manifest manifest = new Manifest(String.class.getResourceAsStream("/META-INF/MANIFEST.MF"));
                 manifest.getMainAttributes().forEach((k, v) ->
-                        jsonManifest.append(String.valueOf(k), String.valueOf(v))
+                        params.append(String.valueOf(k), String.valueOf(v))
                 );
+
+                NetworkInterface networkInterface = NetworkTools.getNetworkInterface(client.getHost(), client.getPort());
+                if (networkInterface != null) {
+                    params.append("mac", NetworkTools.formatMacAddress(networkInterface.getHardwareAddress()));
+                    params.append("ip", NetworkTools.getIPv4Address(networkInterface));
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

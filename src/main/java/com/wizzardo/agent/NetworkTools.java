@@ -4,10 +4,7 @@ import com.wizzardo.tools.io.IOTools;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
+import java.net.*;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 
@@ -68,6 +65,15 @@ public class NetworkTools {
                     return i;
                 } catch (IOException ignored) {
                 }
+            }
+        }
+        return null;
+    }
+
+    public static String getIPv4Address(NetworkInterface networkInterface) {
+        for (InetAddress address : Collections.list(networkInterface.getInetAddresses())) {
+            if (address instanceof Inet4Address) {
+                return address.getHostAddress();
             }
         }
         return null;

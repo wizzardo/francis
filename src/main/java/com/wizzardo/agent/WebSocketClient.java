@@ -6,8 +6,9 @@ import com.wizzardo.tools.json.JsonObject;
 import com.wizzardo.tools.json.JsonTools;
 
 import java.io.IOException;
-import java.net.*;
-import java.util.*;
+import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by wizzardo on 25/01/17.
@@ -34,6 +35,14 @@ public class WebSocketClient extends SimpleWebSocketClient {
         CommandHandler old = handlers.putIfAbsent(command, handler);
         if (old != null)
             throw new IllegalArgumentException("Handler for command '" + command + "' is already registered");
+    }
+
+    public String getHost() {
+        return request.host();
+    }
+
+    public int getPort() {
+        return request.port();
     }
 
     @Override
