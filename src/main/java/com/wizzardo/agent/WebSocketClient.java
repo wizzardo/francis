@@ -70,9 +70,19 @@ public class WebSocketClient extends SimpleWebSocketClient {
 
         String command = data.getAsString("command");
         CommandHandler handler = handlers.get(command);
-        if (handler != null)
-            handler.handle(data);
-        else
+        if (handler != null) {
+            try {
+                handler.handle(this, data);
+            } catch (Exception e) {
+                send(new JsonObject()
+                        .append("command", "error")
+                        .append("callbackId", data.getAsInteger("callbackId"))
+                        .append("error", WebSocketHandlers.exceptionToJson(e))
+                        .append("data", data)
+                );
+                e.printStackTrace();
+            }
+        } else
             System.out.println("unknown command: " + message.asString());
 
     }
@@ -91,6 +101,6 @@ public class WebSocketClient extends SimpleWebSocketClient {
     }
 
     protected interface CommandHandler {
-        void handle(JsonObject json);
+        void handle(WebSocketClient client, JsonObject json) throws Exception;
     }
 }

@@ -20,40 +20,60 @@ import java.util.stream.Collectors;
  */
 public class WebSocketHandlers {
     public static void register(WebSocketClient client) {
-        client.registerHandler("hello", json -> {
+        client.registerHandler("hello", new HelloHandler());
+        client.registerHandler("listClasses", new ListClassesHandler());
+        client.registerHandler("listMethods", new ListMethodsHandler());
+        client.registerHandler("addTransformation", new AddTransformationHandler());
+    }
+
+    public static JsonObject exceptionToJson(Throwable t) {
+        JsonObject json = new JsonObject()
+                .append("message", t.getMessage())
+                .append("class", t.getClass().getCanonicalName())
+                .append("stacktrace", new JsonArray()
+                        .appendAll(Arrays.stream(t.getStackTrace())
+                                .map(it -> it.getClassName() + "." + it.getMethodName() + ":" + it.getLineNumber())
+                                .collect(Collectors.toList()))
+                );
+
+        if (t.getCause() != null)
+            json.append("cause", exceptionToJson(t.getCause()));
+
+        return json;
+    }
+
+    private static class HelloHandler implements WebSocketClient.CommandHandler {
+        @Override
+        public void handle(WebSocketClient client, JsonObject json) throws Exception {
             System.out.println(json);
 
             JsonObject params;
             JsonObject response = new JsonObject()
                     .append("command", "setParameters")
                     .append("params", params = new JsonObject());
-            try {
-                String appName = System.getenv("APP_NAME");
-                if (appName != null)
-                    params.append("appName", appName);
 
-                Manifest manifest = new Manifest(String.class.getResourceAsStream("/META-INF/MANIFEST.MF"));
-                manifest.getMainAttributes().forEach((k, v) ->
-                        params.append(String.valueOf(k), String.valueOf(v))
-                );
+            String appName = System.getenv("APP_NAME");
+            if (appName != null)
+                params.append("appName", appName);
 
-                NetworkInterface networkInterface = NetworkTools.getNetworkInterface(client.getHost(), client.getPort());
-                if (networkInterface != null) {
-                    params.append("mac", NetworkTools.formatMacAddress(networkInterface.getHardwareAddress()));
-                    params.append("ip", NetworkTools.getIPv4Address(networkInterface));
-                    params.append("hostname", NetworkTools.getHostname());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+            Manifest manifest = new Manifest(String.class.getResourceAsStream("/META-INF/MANIFEST.MF"));
+            manifest.getMainAttributes().forEach((k, v) ->
+                    params.append(String.valueOf(k), String.valueOf(v))
+            );
+
+            NetworkInterface networkInterface = NetworkTools.getNetworkInterface(client.getHost(), client.getPort());
+            if (networkInterface != null) {
+                params.append("mac", NetworkTools.formatMacAddress(networkInterface.getHardwareAddress()));
+                params.append("ip", NetworkTools.getIPv4Address(networkInterface));
+                params.append("hostname", NetworkTools.getHostname());
             }
-            try {
-                client.send(response);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+            client.send(response);
+        }
+    }
 
-        client.registerHandler("listClasses", json -> {
+    private static class ListClassesHandler implements WebSocketClient.CommandHandler {
+        @Override
+        public void handle(WebSocketClient client, JsonObject json) throws Exception {
             Class[] classes = Francis.instrumentation.getAllLoadedClasses();
             client.send(new JsonObject()
                     .append("command", "listClasses")
@@ -62,38 +82,36 @@ public class WebSocketHandlers {
                             Arrays.stream(classes).map(Class::getCanonicalName).collect(Collectors.toList())
                     ))
             );
-        });
+        }
+    }
 
-        client.registerHandler("listMethods", json -> {
+    private static class ListMethodsHandler implements WebSocketClient.CommandHandler {
+        @Override
+        public void handle(WebSocketClient client, JsonObject json) throws Exception {
             String classname = json.getAsString("class");
-            try {
-                ClassPool cp = ClassPool.getDefault();
-                CtClass cc = cp.get(classname);
-                CtMethod[] declaredMethods = cc.getDeclaredMethods();
-                client.send(new JsonObject()
-                        .append("command", "listMethods")
-                        .append("callbackId", json.getAsInteger("callbackId"))
-                        .append("list", new JsonArray().appendAll(
-                                Arrays.stream(declaredMethods).map(it ->
-                                        Unchecked.call(() -> new JsonObject()
-                                                .append("name", it.getName())
-                                                .append("descriptor", it.getSignature())
-                                                .append("returnType", it.getReturnType().getName()))
-                                                .append("args", new JsonArray().appendAll(Unchecked.call(() ->
-                                                        Arrays.stream(it.getParameterTypes()).map(CtClass::getName).collect(Collectors.toList()))))
-                                ).collect(Collectors.toList())
-                        ))
-                );
-            } catch (Exception e) {
-                client.send(new JsonObject()
-                        .append("command", "listMethods")
-                        .append("callbackId", json.getAsInteger("callbackId"))
-                        .append("error", exceptionToJson(e))
-                );
-            }
-        });
+            ClassPool cp = ClassPool.getDefault();
+            CtClass cc = cp.get(classname);
+            CtMethod[] declaredMethods = cc.getDeclaredMethods();
+            client.send(new JsonObject()
+                    .append("command", "listMethods")
+                    .append("callbackId", json.getAsInteger("callbackId"))
+                    .append("list", new JsonArray().appendAll(
+                            Arrays.stream(declaredMethods).map(it ->
+                                    Unchecked.call(() -> new JsonObject()
+                                            .append("name", it.getName())
+                                            .append("descriptor", it.getSignature())
+                                            .append("returnType", it.getReturnType().getName()))
+                                            .append("args", new JsonArray().appendAll(Unchecked.call(() ->
+                                                    Arrays.stream(it.getParameterTypes()).map(CtClass::getName).collect(Collectors.toList()))))
+                            ).collect(Collectors.toList())
+                    ))
+            );
+        }
+    }
 
-        client.registerHandler("addTransformation", json -> {
+    private static class AddTransformationHandler implements WebSocketClient.CommandHandler {
+        @Override
+        public void handle(WebSocketClient client, JsonObject json) throws Exception {
             TransformationDefinition definition = new TransformationDefinition();
             definition.id = json.getAsLong("id");
             definition.clazz = json.getAsString("class");
@@ -130,22 +148,6 @@ public class WebSocketHandlers {
                         ))
                 );
             }
-        });
-    }
-
-    public static JsonObject exceptionToJson(Throwable t) {
-        JsonObject json = new JsonObject()
-                .append("message", t.getMessage())
-                .append("class", t.getClass().getCanonicalName())
-                .append("stacktrace", new JsonArray()
-                        .appendAll(Arrays.stream(t.getStackTrace())
-                                .map(it -> it.getClassName() + "." + it.getMethodName() + ":" + it.getLineNumber())
-                                .collect(Collectors.toList()))
-                );
-
-        if (t.getCause() != null)
-            json.append("cause", exceptionToJson(t.getCause()));
-
-        return json;
+        }
     }
 }
