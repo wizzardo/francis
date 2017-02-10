@@ -3,6 +3,7 @@ package com.wizzardo.agent;
 import com.wizzardo.tools.json.JsonArray;
 import com.wizzardo.tools.json.JsonItem;
 import com.wizzardo.tools.json.JsonObject;
+import com.wizzardo.tools.json.JsonTools;
 import com.wizzardo.tools.misc.Unchecked;
 import javassist.ClassPool;
 import javassist.CtClass;
@@ -12,6 +13,7 @@ import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Map;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
@@ -24,6 +26,12 @@ public class WebSocketHandlers {
         client.registerHandler("listClasses", new ListClassesHandler());
         client.registerHandler("listMethods", new ListMethodsHandler());
         client.registerHandler("addTransformation", new AddTransformationHandler());
+        client.registerHandler("getTransformationsResponse", (c, json) -> {
+            for (JsonItem item : json.getAsJsonArray("list")) {
+                TransformationDefinition transformation = read(item.asJsonObject());
+                Francis.instrument(transformation);
+            }
+        });
     }
 
     public static JsonObject exceptionToJson(Throwable t) {
@@ -68,6 +76,10 @@ public class WebSocketHandlers {
                 params.append("hostname", NetworkTools.getHostname());
             }
             client.send(response);
+
+            client.send(new JsonObject()
+                    .append("command", "getTransformations")
+            );
         }
     }
 
@@ -112,25 +124,7 @@ public class WebSocketHandlers {
     private static class AddTransformationHandler implements WebSocketClient.CommandHandler {
         @Override
         public void handle(WebSocketClient client, JsonObject json) throws Exception {
-            TransformationDefinition definition = new TransformationDefinition();
-            definition.id = json.getAsLong("id");
-            definition.clazz = json.getAsString("class");
-            definition.method = json.getAsString("method");
-            definition.methodDescriptor = json.getAsString("methodDescriptor");
-            definition.before = json.getAsString("before");
-            definition.after = json.getAsString("after");
-            JsonArray localVariables = json.getAsJsonArray("localVariables");
-            if (localVariables == null) {
-                definition.localVariables = Collections.emptyList();
-            } else {
-                definition.localVariables = new ArrayList<>(localVariables.size());
-                for (JsonItem item : localVariables) {
-                    TransformationDefinition.Variable variable = new TransformationDefinition.Variable();
-                    variable.name = item.asJsonObject().getAsString("name");
-                    variable.type = item.asJsonObject().getAsString("type");
-                    definition.localVariables.add(variable);
-                }
-            }
+            TransformationDefinition definition = read(json);
             try {
                 Francis.instrument(definition);
             } catch (Throwable t) {
@@ -149,5 +143,31 @@ public class WebSocketHandlers {
                 );
             }
         }
+    }
+
+    static TransformationDefinition read(JsonObject json) {
+        TransformationDefinition definition = new TransformationDefinition();
+        definition.id = json.getAsLong("id");
+        definition.clazz = json.getAsString("className");
+        definition.method = json.getAsString("method");
+        definition.methodDescriptor = json.getAsString("methodDescriptor");
+        definition.before = json.getAsString("before");
+        definition.after = json.getAsString("after");
+
+        JsonArray variables = JsonTools.parse(json.getAsString("variables", "[]")).asJsonArray();
+        if (variables.isEmpty()) {
+            definition.localVariables = Collections.emptyList();
+        } else {
+            definition.localVariables = new ArrayList<>(variables.size());
+            for (JsonItem item : variables) {
+                for (Map.Entry<String, JsonItem> entry : item.asJsonObject().entrySet()) {
+                    TransformationDefinition.Variable variable = new TransformationDefinition.Variable();
+                    variable.name = entry.getKey();
+                    variable.type = entry.getValue().asString();
+                    definition.localVariables.add(variable);
+                }
+            }
+        }
+        return definition;
     }
 }
