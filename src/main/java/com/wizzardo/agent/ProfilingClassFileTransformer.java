@@ -13,7 +13,7 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.nio.file.Files;
 import java.security.ProtectionDomain;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -33,8 +33,8 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
         byte[] byteCode = classfileBuffer;
 
         if (classBeingRedefined != null) {
-            List<TransformationDefinition> list = Francis.instrumentations.get(classBeingRedefined.getCanonicalName());
-            if (list != null && !list.isEmpty()) {
+            Map<Long, TransformationDefinition> transformations = Francis.instrumentations.get(classBeingRedefined.getCanonicalName());
+            if (transformations != null && !transformations.isEmpty()) {
                 long time = System.nanoTime();
                 try {
                     ClassPool cp = ClassPool.getDefault();
@@ -43,7 +43,7 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
                     new File("/tmp/classes").mkdirs();
                     Files.write(new File("/tmp/classes/" + classBeingRedefined.getCanonicalName() + ".before.class").toPath(), byteCode);
 
-                    Iterator<TransformationDefinition> iterator = list.iterator();
+                    Iterator<TransformationDefinition> iterator = transformations.values().iterator();
                     while (iterator.hasNext()) {
                         TransformationDefinition definition = iterator.next();
                         try {
@@ -119,7 +119,7 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
                     Files.write(new File("/tmp/classes/" + classBeingRedefined.getCanonicalName() + ".after.class").toPath(), byteCode);
                     cc.detach();
 
-                    for (TransformationDefinition definition : list) {
+                    for (TransformationDefinition definition : transformations.values()) {
                         client.send(new JsonObject()
                                 .append("command", "transformationApplied")
                                 .append("transformationId", definition.id)

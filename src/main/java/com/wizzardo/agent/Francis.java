@@ -22,7 +22,7 @@ public class Francis {
 
     static ClassLoader mainClassLoader;
     static Instrumentation instrumentation;
-    static Map<String, List<TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
+    static Map<String, Map<Long,TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
     static ExceptionHandler exceptionHandler = e -> {
         e.printStackTrace();
     };
@@ -61,12 +61,30 @@ public class Francis {
         Francis.exceptionHandler = exceptionHandler;
     }
 
-    public synchronized static void instrument(TransformationDefinition definition) {
-        List<TransformationDefinition> list = instrumentations.get(definition.clazz);
-        if (list == null)
-            instrumentations.put(definition.clazz, list = new ArrayList<>());
+    public synchronized static void deleteTransformation(Long id, String className) {
+        Map<Long,TransformationDefinition> transformations = instrumentations.get(className);
+        if (transformations == null)
+            return;
 
-        list.add(definition);
+        transformations.remove(id);
+
+        try {
+            Class<?> aClass = Class.forName(className, true, mainClassLoader);
+            System.out.println("trigger retransform for " + aClass.getCanonicalName());
+            instrumentation.retransformClasses(aClass);
+        } catch (UnmodifiableClassException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized static void instrument(TransformationDefinition definition) {
+        Map<Long,TransformationDefinition> transformations = instrumentations.get(definition.clazz);
+        if (transformations == null)
+            instrumentations.put(definition.clazz, transformations = new HashMap<>());
+
+        transformations.put(definition.id, definition);
 
         try {
             Class<?> aClass = Class.forName(definition.clazz, true, mainClassLoader);

@@ -26,6 +26,9 @@ public class WebSocketHandlers {
         client.registerHandler("listClasses", new ListClassesHandler());
         client.registerHandler("listMethods", new ListMethodsHandler());
         client.registerHandler("addTransformation", new AddTransformationHandler());
+        client.registerHandler("deleteTransformation", (c, json) -> {
+            Francis.deleteTransformation(json.getAsLong("id"), json.getAsString("className"));
+        });
         client.registerHandler("getTransformationsResponse", (c, json) -> {
             for (JsonItem item : json.getAsJsonArray("list")) {
                 TransformationDefinition transformation = read(item.asJsonObject());
