@@ -1,5 +1,12 @@
 package com.wizzardo.agent;
 
+import com.wizzardo.tools.json.JsonArray;
+import com.wizzardo.tools.json.JsonObject;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
+import javassist.NotFoundException;
+
 import java.io.File;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -8,13 +15,6 @@ import java.security.ProtectionDomain;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import com.wizzardo.tools.json.JsonArray;
-import com.wizzardo.tools.json.JsonObject;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.NotFoundException;
 
 /**
  * Created by wizzardo on 13/01/17.
@@ -54,6 +54,16 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
                                 CtClass type = readClass(variable.type, cp);
                                 System.out.println("adding local variable: " + type + " " + variable.name);
                                 m.addLocalVariable(variable.name, type);
+                            }
+
+                            if (definition.before != null && !definition.before.isEmpty()) {
+                                System.out.println("adding before: " + definition.before);
+                                m.insertBefore(wrapSafe(definition.before));
+//                                m.insertBefore(definition.before);
+                            }
+                            for (TransformationDefinition.Variable variable : definition.localVariables) {
+                                CtClass type = readClass(variable.type, cp);
+                                System.out.println("initialize local variable: " + type + " " + variable.name);
                                 if (type == CtClass.intType)
                                     m.insertBefore(variable.name + " = 0;");
                                 else if (type == CtClass.longType)
@@ -72,12 +82,6 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
                                     m.insertBefore(variable.name + " = false;");
                                 else
                                     m.insertBefore(variable.name + " = null;");
-                            }
-
-                            if (definition.before != null && !definition.before.isEmpty()) {
-                                System.out.println("adding before: " + definition.before);
-                                m.insertBefore(wrapSafe(definition.before));
-//                                m.insertBefore(definition.before);
                             }
 
                             if (definition.after != null && !definition.after.isEmpty()) {
