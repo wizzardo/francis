@@ -10,10 +10,7 @@ import javassist.CtClass;
 import javassist.CtMethod;
 
 import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
@@ -94,7 +91,16 @@ public class WebSocketHandlers {
                     .append("command", "listClasses")
                     .append("callbackId", json.getAsInteger("callbackId"))
                     .append("list", new JsonArray().appendAll(
-                            Arrays.stream(classes).map(Class::getCanonicalName).collect(Collectors.toList())
+                            Arrays.stream(classes)
+                                    .map((aClass) -> {
+                                        try {
+                                            return aClass.getCanonicalName();
+                                        } catch (IllegalAccessError e) {
+                                            return null;
+                                        }
+                                    })
+                                    .filter(Objects::nonNull)
+                                    .collect(Collectors.toList())
                     ))
             );
         }
