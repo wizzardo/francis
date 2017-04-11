@@ -1,5 +1,6 @@
 package com.wizzardo.agent;
 
+import com.wizzardo.tools.json.JsonObject;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -22,7 +23,7 @@ public class Francis {
 
     static ClassLoader mainClassLoader;
     static Instrumentation instrumentation;
-    static Map<String, Map<Long,TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
+    static Map<String, Map<Long, TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
     static ExceptionHandler exceptionHandler = e -> {
         e.printStackTrace();
     };
@@ -45,6 +46,15 @@ public class Francis {
             e.printStackTrace();
         }
 
+        StatsCollector statsCollector = new StatsCollector();
+        statsCollector.interval = 1000;
+        statsCollector.start();
+        WebSocketClient finalClient = client;
+        statsCollector.setThreadStatsHandler(threadStats -> finalClient.send(new JsonObject()
+                .append("command", "threadsStats")
+                .append("list", threadStats)
+        ));
+
         instrumentation.addTransformer(new ProfilingClassFileTransformer(client), true);
     }
 
@@ -62,7 +72,7 @@ public class Francis {
     }
 
     public synchronized static void deleteTransformation(Long id, String className) {
-        Map<Long,TransformationDefinition> transformations = instrumentations.get(className);
+        Map<Long, TransformationDefinition> transformations = instrumentations.get(className);
         if (transformations == null)
             return;
 
@@ -80,7 +90,7 @@ public class Francis {
     }
 
     public synchronized static void instrument(TransformationDefinition definition) {
-        Map<Long,TransformationDefinition> transformations = instrumentations.get(definition.clazz);
+        Map<Long, TransformationDefinition> transformations = instrumentations.get(definition.clazz);
         if (transformations == null)
             instrumentations.put(definition.clazz, transformations = new HashMap<>());
 
