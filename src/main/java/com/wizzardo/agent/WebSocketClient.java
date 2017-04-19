@@ -28,7 +28,7 @@ public class WebSocketClient extends SimpleWebSocketClient {
     public WebSocketClient(String url) throws URISyntaxException, IOException {
         super(new Request(url));
         setDaemon(true);
-        setDefaultUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+        setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
     }
 
     public void registerHandler(String command, CommandHandler handler) {
