@@ -29,12 +29,10 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
 
     public byte[] transform(ClassLoader loader, String className, Class classBeingRedefined,
                             ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-
-        byte[] byteCode = classfileBuffer;
-
         if (classBeingRedefined != null) {
             Map<Long, TransformationDefinition> transformations = Francis.instrumentations.get(classBeingRedefined.getCanonicalName());
             if (transformations != null && !transformations.isEmpty()) {
+                byte[] byteCode = classfileBuffer;
                 long time = System.nanoTime();
                 try {
                     ClassPool cp = ClassPool.getDefault();
@@ -139,10 +137,11 @@ public class ProfilingClassFileTransformer implements ClassFileTransformer {
 
                 time = System.nanoTime() - time;
                 System.out.println("instrumented in " + time + " nanos");
+                return byteCode;
             }
         }
 
-        return byteCode;
+        return null;
     }
 
     protected CtClass readClass(String clazz, ClassPool cp) throws NotFoundException {
