@@ -3,13 +3,15 @@ package com.wizzardo.agent;
 import com.wizzardo.tools.interfaces.Consumer;
 
 import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
 import java.util.*;
 
 /**
  * Created by wizzardo on 11/04/17.
  */
 public class StatsCollector extends Thread {
-    volatile long interval;
+    volatile long interval = 1000;
+    volatile boolean enabled = false;
 
     int tickCounter = 0;
     com.sun.management.ThreadMXBean threadMXBean;
@@ -70,6 +72,17 @@ public class StatsCollector extends Thread {
     public void run() {
         List<ThreadStats> threadsStats = new ArrayList<>();
         while (true) {
+            if (!enabled) {
+                synchronized (this) {
+                    while (!enabled) {
+                        try {
+                            this.wait();
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
+                }
+            }
+
             if (threadStatsHandler != null) {
                 gatherThreadStats(threadsStats);
 //                System.out.println();
@@ -83,6 +96,21 @@ public class StatsCollector extends Thread {
             } catch (InterruptedException ignored) {
             }
         }
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void enable() {
+        synchronized (this) {
+            enabled = true;
+            this.notifyAll();
+        }
+    }
+
+    public void disable() {
+        enabled = false;
     }
 
     protected void gatherThreadStats(List<ThreadStats> results) {
@@ -109,7 +137,11 @@ public class StatsCollector extends Thread {
                 tInfo = new TInfo();
                 tInfo.id = id;
                 threads.put(id, tInfo);
-                tInfo.name = threadMXBean.getThreadInfo(tInfo.id).getThreadName();
+                ThreadInfo threadInfo = threadMXBean.getThreadInfo(tInfo.id);
+                if (threadInfo == null)
+                    continue;
+
+                tInfo.name = threadInfo.getThreadName();
                 tInfo.group = threadGroup(id).getName();
             } else {
                 ThreadStats diff = new ThreadStats(tInfo.id, tInfo.name, tInfo.group, bytesAllocated - tInfo.bytesAllocated, cpuTime - tInfo.cpuTime);

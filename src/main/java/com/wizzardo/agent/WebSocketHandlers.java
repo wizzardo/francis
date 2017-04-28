@@ -32,6 +32,15 @@ public class WebSocketHandlers {
                 Francis.instrument(transformation);
             }
         });
+
+        client.registerHandler("enableStatsCollector", (c, json) -> Francis.statsCollector.enable());
+        client.registerHandler("disableStatsCollector", (c, json) -> Francis.statsCollector.disable());
+        client.registerHandler("isStatsCollectorEnabled", (c, json) -> {
+            JsonObject response = new JsonObject()
+                    .append("command", "isStatsCollectorEnabled")
+                    .append("isEnabled", Francis.statsCollector.isEnabled());
+            c.send(response);
+        });
     }
 
     public static JsonObject exceptionToJson(Throwable t) {

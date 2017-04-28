@@ -22,6 +22,7 @@ public class Francis {
     }
 
     static ClassLoader mainClassLoader;
+    static StatsCollector statsCollector;
     static Instrumentation instrumentation;
     static Map<String, Map<Long, TransformationDefinition>> instrumentations = new ConcurrentHashMap<>();
     static ExceptionHandler exceptionHandler = e -> {
@@ -40,14 +41,11 @@ public class Francis {
             client = new WebSocketClient(francisWsUrl);
             WebSocketHandlers.register(client);
             client.start();
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (URISyntaxException | IOException e) {
             e.printStackTrace();
         }
 
-        StatsCollector statsCollector = new StatsCollector();
-        statsCollector.interval = 1000;
+        statsCollector = new StatsCollector();
         statsCollector.start();
         WebSocketClient finalClient = client;
         statsCollector.setThreadStatsHandler(threadStats -> finalClient.send(new JsonObject()
